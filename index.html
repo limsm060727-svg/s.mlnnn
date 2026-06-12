@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroFit — 건강한 제로식품 안내 앱</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #080808;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px 0 32px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+    select option { background: #1a1a1a; color: #fff; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    const SWEETENERS = {
+      수크랄로스: {
+        safe: true, tag: "✓ 추천", kcal: "0 kcal/g", gi: "0 (혈당 영향 없음)",
+        desc: "설탕을 베이스로 하는 물질로, 설탕의 일부 작용기가 염소 등으로 치환된 화합물. 설탕의 600배 단맛을 낸다. 무열량 감미료로 당알코올 계열이 아니라 많이 섭취해도 설사 등의 부작용이 거의 없어 대체당 용도로 식품 제조 및 가공에 널리 사용된다.",
+      },
+      아세설팜칼륨: {
+        safe: true, tag: "✓ 추천", kcal: "0 kcal/g", gi: "0 (혈당 영향 없음)",
+        desc: "설탕보다 약 200배 정도 강한 단맛을 내는 인공 감미료다. 국제적으로 Ace-K 또는 식품첨가물 코드 E950으로 불린다. 칼로리가 사실상 없으면서도 맛이 강하고, 가열 과정에서도 단맛이 사라지지 않아 베이킹에도 활용된다.",
+      },
+      에리스리톨: {
+        safe: true, tag: "✓ 추천", kcal: "0.24 kcal/g", gi: "1 (매우 낮음)",
+        desc: "칼로리가 0.24 kcal/g 정도로 매우 낮으며, 혈당이 거의 오르지 않기 때문에 당뇨병 환자를 위한 감미료로 사용되기도 한다. 자연계에서도 발견되는 당알코올 계열 감미료다.",
+      },
+      스테비아: {
+        safe: true, tag: "✓ 추천", kcal: "0 kcal/g", gi: "0 (혈당 영향 없음)",
+        desc: "스테비아는 천연 식물에서 추출한 감미료로, 칼로리가 거의 없고 혈당을 올리지 않는다. 설탕보다 200~300배 달다. 효소처리 스테비아는 쓴맛을 줄이기 위해 효소처리를 한 감미료다.",
+      },
+      아스파탐: {
+        safe: true, tag: "✓ 일반 안전", kcal: "4 kcal/g (소량 사용)", gi: "0 (혈당 영향 없음)",
+        desc: "설탕보다 약 200배 단맛을 내는 인공 감미료로, 저칼로리 식품에 광범위하게 사용된다. 열에 불안정하여 고온에서 분해될 수 있으며, 페닐케톤뇨증 환자는 주의해야 한다.",
+      },
+      사카린: {
+        safe: true, tag: "✓ 추천", kcal: "0 kcal/g", gi: "0 (혈당 영향 없음)",
+        desc: "설탕보다 300~400배 단맛을 내는 오래된 인공 감미료다. 칼로리가 없으며 혈당에 영향을 주지 않는다. 과거 안전성 논란이 있었으나 현재는 안전한 감미료로 재분류되었다.",
+      },
+      말티톨: {
+        safe: false, tag: "⚠ 주의", kcal: "2.1 kcal/g", gi: "35~52 (중간 수준)",
+        desc: "흔히 대체당으로 불리지만 제로 칼로리 감미료가 아니며 혈당을 올리는 성질이 있다. 설탕의 혈당 지수(GI)는 60~65이고 말티톨은 35~52 수준으로 당알코올 중에서는 비교적 높은 편이다. 당뇨 환자나 혈당 관리가 필요한 사람에게는 주의가 필요하다.",
+      },
+      폴리글리시톨: {
+        safe: false, tag: "⚠ 주의", kcal: "약 2.1 kcal/g", gi: "39~68 (높은 수준)",
+        desc: "사실상 0.7 설탕이다. 혈당을 올리는 것도 마찬가지다. 다른 당알코올과 같이 무설탕 제품에 많이 첨가된다. '무설탕'이라는 표현은 엄밀히 거짓말은 아니지만, 혈당을 올리는 면에서는 설탕과 큰 차이가 없다.",
+      },
+      "폴리글리시톨시럽": {
+        safe: false, tag: "⚠ 주의", kcal: "약 2.1 kcal/g", gi: "39~68 (높은 수준)",
+        desc: "폴리글리시톨의 시럽 형태. 무설탕 제품에 단맛 및 수분 유지 목적으로 사용되지만 혈당을 유의미하게 상승시킨다.",
+      },
+    };
+
+    const PRODUCTS = [
+      { id: 1, name: "라라스윗 바닐라 아이스크림",       price: "6,000원",  cat: "아이스크림", icon: "ti-ice-cream",    sweeteners: ["에리스리톨","스테비아"] },
+      { id: 2, name: "라라스윗 말차 초코바 4개",         price: "7,999원",  cat: "스낵",       icon: "ti-candy",        sweeteners: ["에리스리톨","수크랄로스"] },
+      { id: 3, name: "초코헬스 초코볼 4봉",              price: "8,500원",  cat: "스낵",       icon: "ti-candy",        sweeteners: ["에리스리톨","스테비아"] },
+      { id: 4, name: "걱정없는 믹스커피 30개입",         price: "9,810원",  cat: "음료",       icon: "ti-coffee",       sweeteners: ["수크랄로스"] },
+      { id: 5, name: "프렌치카페 스테비아 믹스 100개입", price: "27,800원", cat: "음료",       icon: "ti-coffee",       sweeteners: ["스테비아"] },
+      { id: 6, name: "스테비아 누룽지효소 커피믹스 30개입", price: "14,900원", cat: "음료",    icon: "ti-coffee",       sweeteners: ["에리스리톨","스테비아"] },
+      { id: 7, name: "제로 그래놀라 바",                 price: "3,200원",  cat: "스낵",       icon: "ti-salad",        sweeteners: ["에리스리톨"] },
+      { id: 8, name: "스테비아 요거트 4개입",            price: "5,400원",  cat: "유제품",     icon: "ti-glass",        sweeteners: ["스테비아","수크랄로스"] },
+    ];
+
+    const SCAN_SCENARIOS = {
+      good: { label: "코카콜라 제로", found: ["수크랄로스","아세설팜칼륨"], result: "good" },
+      bad:  { label: "제로 쿠키",    found: ["말티톨","폴리글리시톨시럽"], result: "bad" },
+    };
+
+    function ZeroFit() {
+      const [screen, setScreen]             = useState("login");
+      const [modal, setModal]               = useState(true);
+      const [skipModal, setSkipModal]       = useState(false);
+      const [wikiTab, setWikiTab]           = useState("scan");
+      const [scanPhase, setScanPhase]       = useState("idle");
+      const [scanData, setScanData]         = useState(null);
+      const [searchQ, setSearchQ]           = useState("");
+      const [searchSel, setSearchSel]       = useState(null);
+      const [searchHistory, setSearchHistory] = useState(["아세설팜칼륨","아스파탐","탄산수소나트륨","사과산","사카린"]);
+      const [recDetail, setRecDetail]       = useState(null);
+      const [mktCat, setMktCat]             = useState("전체");
+      const [cart, setCart]                 = useState([]);
+      const [profile, setProfile]           = useState({ nick: "", gender: "", age: "" });
+      const [profSaved, setProfSaved]       = useState(false);
+      const [profEdit, setProfEdit]         = useState(false);
+      const [editBuf, setEditBuf]           = useState({ nick: "", gender: "", age: "" });
+      const [loginId, setLoginId]           = useState("");
+      const [loginPw, setLoginPw]           = useState("");
+      const [mktDetail, setMktDetail]       = useState(null);
+
+      const C = {
+        bg: "#0D0D0D", surf: "#181818", surf2: "#222222",
+        red: "#E8394A", redDim: "rgba(232,57,74,0.12)", pink: "#F0A0AA",
+        green: "#4CAF50", greenDim: "rgba(76,175,80,0.12)",
+        text: "#FFFFFF", sub: "#AAAAAA", hint: "#666666", border: "#2A2A2A",
+      };
+
+      const styles = {
+        phone: {
+          width: 375, minHeight: 720, background: C.bg,
+          borderRadius: 32, border: `1.5px solid ${C.border}`,
+          overflow: "hidden", display: "flex", flexDirection: "column",
+          margin: "0 auto", boxShadow: `0 0 80px rgba(232,57,74,0.1)`, position: "relative",
+        },
+        bar: {
+          height: 36, background: C.bg, display: "flex", alignItems: "center",
+          justifyContent: "space-between", padding: "0 18px",
+          fontSize: 11, color: C.hint, flexShrink: 0,
+        },
+        scroll: { flex: 1, overflowY: "auto", overflowX: "hidden" },
+        nav: {
+          height: 64, background: "#111", borderTop: `1px solid ${C.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-around",
+          flexShrink: 0, paddingBottom: 6,
+        },
+        card: {
+          background: C.surf, borderRadius: 14, padding: "14px 16px",
+          border: `1px solid ${C.border}`, marginBottom: 10,
+        },
+        input: {
+          width: "100%", background: "#111", border: `1px solid ${C.border}`,
+          borderRadius: 10, padding: "11px 14px", color: C.text, fontSize: 14, outline: "none", boxSizing: "border-box",
+        },
+        btnPri: {
+          background: C.red, color: "#fff", border: "none", borderRadius: 12,
+          padding: "12px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", width: "100%",
+        },
+        btnOut: {
+          background: "transparent", color: C.red, border: `1px solid ${C.red}`,
+          borderRadius: 12, padding: "11px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", width: "100%",
+        },
+        btnGhost: {
+          background: C.surf2, color: C.text, border: "none", borderRadius: 12,
+          padding: "11px 20px", fontWeight: 700, fontSize: 14, cursor: "pointer", width: "100%",
+        },
+        tagGood: {
+          display: "inline-block", background: C.greenDim, color: C.green,
+          border: `1px solid rgba(76,175,80,0.35)`, borderRadius: 20,
+          padding: "2px 9px", fontSize: 11, fontWeight: 700,
+        },
+        tagBad: {
+          display: "inline-block", background: C.redDim, color: C.red,
+          border: `1px solid rgba(232,57,74,0.35)`, borderRadius: 20,
+          padding: "2px 9px", fontSize: 11, fontWeight: 700,
+        },
+        header: {
+          display: "flex", alignItems: "center", padding: "14px 16px",
+          borderBottom: `1px solid ${C.border}`, gap: 10,
+        },
+        divider: { height: 1, background: C.border, margin: "10px 0" },
+      };
+
+      function navTo(s) { setScreen(s); setMktDetail(null); setRecDetail(null); }
+
+      function doSearch(term) {
+        const found = SWEETENERS[term];
+        setSearchSel(found ? { name: term, ...found } : null);
+        if (term && !searchHistory.includes(term)) setSearchHistory([term, ...searchHistory.slice(0, 6)]);
+        setSearchQ(term);
+      }
+
+      function startScan(type) {
+        setScanPhase("scanning");
+        setTimeout(() => { setScanData(SCAN_SCENARIOS[type]); setScanPhase("result"); }, 1400);
+      }
+
+      function addToCart(id) {
+        setCart(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+      }
+
+      function SB() {
+        return (
+          <div style={styles.bar}>
+            <span>9:41</span>
+            <span style={{ color: C.red, fontWeight: 700, fontSize: 12 }}>ZEROFIT</span>
+            <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <i className="ti ti-wifi" style={{ fontSize: 12 }} />
+              <i className="ti ti-battery-2" style={{ fontSize: 12 }} />
+            </span>
+          </div>
+        );
+      }
+
+      function Header({ title, onBack }) {
+        return (
+          <div style={styles.header}>
+            <button onClick={onBack} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 22, lineHeight: 1, padding: 0 }}>‹</button>
+            <span style={{ fontSize: 17, fontWeight: 800 }}>{title}</span>
+          </div>
+        );
+      }
+
+      function Wave() {
+        return (
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, pointerEvents: "none", opacity: 0.25 }}>
+            <svg viewBox="0 0 375 60" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", display: "block" }}>
+              <path d="M0,35 C60,15 120,55 180,35 C240,15 300,55 375,35 L375,60 L0,60Z" fill="none" stroke="#E8394A" strokeWidth="1.2" />
+              <path d="M0,45 C70,25 140,65 210,45 C280,25 330,55 375,45 L375,60 L0,60Z" fill="none" stroke="#E8394A" strokeWidth="0.6" />
+              <path d="M0,55 C50,40 100,65 180,55 C260,45 310,60 375,55 L375,60 L0,60Z" fill="none" stroke="#E8394A" strokeWidth="0.4" />
+            </svg>
+          </div>
+        );
+      }
+
+      function NavBar() {
+        const items = [
+          { id: "home",   icon: "ti-home",          label: "홈" },
+          { id: "wiki",   icon: "ti-microscope",     label: "위키" },
+          { id: "market", icon: "ti-shopping-cart",  label: "마켓" },
+          { id: "mypage", icon: "ti-user",           label: "마이" },
+        ];
+        return (
+          <div style={styles.nav} role="navigation" aria-label="앱 내비게이션">
+            {items.map(item => {
+              const active = screen === item.id;
+              return (
+                <button key={item.id} onClick={() => navTo(item.id)}
+                  style={{ background: active ? C.redDim : "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 14px", borderRadius: 10 }}
+                  aria-label={item.label} aria-current={active ? "page" : undefined}
+                >
+                  <i className={`ti ${item.icon}`} style={{ fontSize: 20, color: active ? C.red : C.hint }} />
+                  <span style={{ fontSize: 10, color: active ? C.red : C.hint, fontWeight: active ? 700 : 400 }}>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      }
+
+      /* ──────────────── LOGIN ──────────────── */
+      function LoginScreen() {
+        return (
+          <div style={{ flex: 1, overflowY: "auto", position: "relative" }}>
+            <SB />
+            <div style={{ padding: "40px 28px 32px", display: "flex", flexDirection: "column", alignItems: "center", minHeight: 640, position: "relative" }}>
+              <Wave />
+              <div style={{ marginBottom: 36, textAlign: "center", zIndex: 1 }}>
+                <div style={{ fontSize: 44, marginBottom: 6 }}>
+                  <i className="ti ti-snowflake" style={{ color: C.red }} />
+                </div>
+                <div style={{ fontSize: 34, fontWeight: 900, letterSpacing: -1 }}>
+                  ZERO<span style={{ color: C.red }}>FIT</span>
+                </div>
+                <div style={{ color: C.sub, fontSize: 12, marginTop: 4 }}>건강한 제로 소비를 위한 가이드</div>
+              </div>
+              <div style={{ width: "100%", maxWidth: 300, zIndex: 1 }}>
+                <div style={{ color: C.red, fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 14 }}>LOGIN</div>
+                <input style={{ ...styles.input, marginBottom: 10 }} placeholder="아이디" value={loginId} onChange={e => setLoginId(e.target.value)} />
+                <input style={{ ...styles.input, marginBottom: 20 }} type="password" placeholder="비밀번호" value={loginPw} onChange={e => setLoginPw(e.target.value)} />
+                <button style={styles.btnPri} onClick={() => navTo("home")}>로그인</button>
+                <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 14 }}>
+                  {["아이디 저장", "자동 로그인"].map(label => (
+                    <label key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.hint, cursor: "pointer" }}>
+                      <input type="checkbox" style={{ accentColor: C.red }} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {modal && (
+              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}>
+                <div style={{ background: "#1E1E1E", borderRadius: 16, padding: 20, maxWidth: 310, border: `1px solid ${C.border}` }} role="dialog" aria-modal="true" aria-label="건강 안내 팝업">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: C.red }}>건강한 '제로' 소비를 위한 안내</div>
+                    <button onClick={() => setModal(false)} style={{ background: "none", border: "none", color: C.hint, cursor: "pointer", fontSize: 20, lineHeight: 1, padding: 0 }} aria-label="닫기">×</button>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#CCC", lineHeight: 1.75, marginBottom: 10 }}>
+                    모든 제로 음료에는 설탕 대신 단맛을 내는 <span style={{ color: C.pink }}>인공 감미료</span>가 함유되어 있습니다. 당류와 칼로리는 낮지만, 인공 감미료의 강한 단맛에 지속적으로 노출될 경우 우리 몸의 <span style={{ color: C.red }}>인슐린 저항성</span>이 높아져 장기적으로 대사 기능에 영향을 줄 수 있습니다.
+                  </p>
+                  <p style={{ fontSize: 12, color: "#CCC", lineHeight: 1.75, marginBottom: 14 }}>
+                    건강한 식단 관리를 위해 제로 음료를 물 대신 마시는 것은 지양해 주시고, <strong style={{ color: "#FFF" }}>적정량만 섭취</strong>하시길 권장합니다.
+                  </p>
+                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.hint, cursor: "pointer" }}>
+                      <input type="checkbox" checked={skipModal} onChange={e => setSkipModal(e.target.checked)} style={{ accentColor: C.red }} />
+                      오늘 하루 보지 않기
+                    </label>
+                    <button onClick={() => setModal(false)} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>확인</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      /* ──────────────── HOME ──────────────── */
+      function HomeScreen() {
+        const menuItems = [
+          { id: "mypage", icon: "ti-user-circle",   label: "마이페이지", desc: "프로필 · 개인 설정" },
+          { id: "wiki",   icon: "ti-microscope",     label: "제로위키",   desc: "성분표 분석 · 대체당 검색 · 추천" },
+          { id: "market", icon: "ti-shopping-cart",  label: "제로마켓",   desc: "건강한 제로식품 쇼핑" },
+        ];
+        return (
+          <div style={{ flex: 1, overflowY: "auto", position: "relative" }}>
+            <SB />
+            <div style={{ padding: "24px 16px 24px", position: "relative", minHeight: 620 }}>
+              <Wave />
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 12, color: C.sub, marginBottom: 4 }}>안녕하세요 👋</div>
+                <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: -1 }}>ZERO<span style={{ color: C.red }}>FIT</span></div>
+                <div style={{ fontSize: 12, color: C.hint, marginTop: 2 }}>건강한 제로 소비를 시작해보세요</div>
+              </div>
+              <div style={{ ...styles.card, background: "linear-gradient(135deg, #1A0A0C, #200C0E)", border: `1px solid rgba(232,57,74,0.25)`, marginBottom: 20 }}>
+                <div style={{ fontSize: 10, color: C.red, fontWeight: 700, letterSpacing: 1, marginBottom: 5 }}>오늘의 TIP</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>말티톨, 정말 제로일까요?</div>
+                <div style={{ fontSize: 11.5, color: "#AAA", lineHeight: 1.65 }}>말티톨의 혈당 지수(GI)는 35~52로, '제로'라고 표시되어도 혈당을 올릴 수 있어요. 성분표를 꼭 확인하세요!</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {menuItems.map(item => (
+                  <button key={item.id} onClick={() => navTo(item.id)}
+                    style={{ ...styles.card, margin: 0, display: "flex", alignItems: "center", gap: 14, cursor: "pointer", textAlign: "left", border: `1px solid ${C.border}` }}>
+                    <div style={{ width: 46, height: 46, background: C.redDim, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <i className={`ti ${item.icon}`} style={{ fontSize: 22, color: C.red }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 800 }}>{item.label}</div>
+                      <div style={{ fontSize: 11, color: C.sub, marginTop: 2 }}>{item.desc}</div>
+                    </div>
+                    <span style={{ marginLeft: "auto", color: C.hint, fontSize: 20 }}>›</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ──────────────── MY PAGE ──────────────── */
+      function MyPageScreen() {
+        const [localBuf, setLocalBuf] = useState(profSaved ? { ...profile } : { nick: "", gender: "", age: "" });
+        const [editing, setEditing]   = useState(!profSaved || profEdit);
+        const genders = ["남", "여", "선택안함"];
+        const ages    = ["10대","20대","30대","40대","50대 이상"];
+
+        function save() {
+          setProfile(localBuf);
+          setProfSaved(true);
+          setEditing(false);
+          setProfEdit(false);
+        }
+
+        return (
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <SB />
+            <Header title="마이페이지" onBack={() => navTo("home")} />
+            <div style={{ padding: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 22 }}>
+                <div style={{ width: 72, height: 72, background: profSaved ? `linear-gradient(135deg, ${C.red}, ${C.pink})` : C.surf2, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+                  <i className="ti ti-user" style={{ fontSize: 30, color: profSaved ? "#fff" : C.hint }} />
+                </div>
+                {profSaved && !editing && <div style={{ fontSize: 16, fontWeight: 800 }}>{profile.nick || "닉네임 없음"}</div>}
+              </div>
+
+              {editing ? (
+                <div style={styles.card}>
+                  <div style={{ fontSize: 11, color: C.sub, fontWeight: 700, marginBottom: 5 }}>닉네임</div>
+                  <input style={{ ...styles.input, marginBottom: 14 }} placeholder="닉네임 입력" value={localBuf.nick} onChange={e => setLocalBuf({ ...localBuf, nick: e.target.value })} />
+                  <div style={{ fontSize: 11, color: C.sub, fontWeight: 700, marginBottom: 5 }}>성별</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                    {genders.map(g => (
+                      <button key={g} onClick={() => setLocalBuf({ ...localBuf, gender: g })}
+                        style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: `1px solid ${localBuf.gender === g ? C.red : C.border}`, background: localBuf.gender === g ? C.redDim : "#111", color: localBuf.gender === g ? C.red : C.sub, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.sub, fontWeight: 700, marginBottom: 5 }}>연령</div>
+                  <select style={{ ...styles.input, marginBottom: 20 }} value={localBuf.age} onChange={e => setLocalBuf({ ...localBuf, age: e.target.value })}>
+                    <option value="">연령 선택</option>
+                    {ages.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                  <button style={styles.btnPri} onClick={save}>저장</button>
+                </div>
+              ) : (
+                <div style={styles.card}>
+                  {[["닉네임","ti-user",profile.nick],["성별","ti-gender-bigender",profile.gender],["연령","ti-calendar",profile.age]].map(([label, icon, val]) => (
+                    <div key={label}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <i className={`ti ${icon}`} style={{ fontSize: 16, color: C.hint }} />
+                          <div>
+                            <div style={{ fontSize: 10, color: C.hint, marginBottom: 1 }}>{label}</div>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{val || "미입력"}</div>
+                          </div>
+                        </div>
+                        <button onClick={() => { setEditBuf({ ...profile }); setEditing(true); }}
+                          style={{ background: C.surf2, border: "none", color: C.sub, borderRadius: 8, padding: "5px 12px", fontSize: 11, cursor: "pointer" }}>수정</button>
+                      </div>
+                      <div style={styles.divider} />
+                    </div>
+                  ))}
+                  <button style={{ ...styles.btnOut, marginTop: 8 }} onClick={() => setEditing(true)}>
+                    <i className="ti ti-edit" style={{ marginRight: 6, fontSize: 14 }} />프로필 편집
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      /* ──────────────── WIKI ──────────────── */
+      function WikiScreen() {
+        const tabs = [
+          { id: "scan",      icon: "ti-camera",   label: "성분표 분석" },
+          { id: "search",    icon: "ti-search",   label: "대체당 검색" },
+          { id: "recommend", icon: "ti-bulb",     label: "대체품 추천" },
+        ];
+        return (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "hidden" }}>
+            <SB />
+            <Header title="제로위키" onBack={() => navTo("home")} />
+            <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
+              {tabs.map(tab => (
+                <button key={tab.id} onClick={() => setWikiTab(tab.id)}
+                  style={{ flex: 1, padding: "10px 4px", background: "none", border: "none", color: wikiTab === tab.id ? C.red : C.hint, fontSize: 10.5, fontWeight: wikiTab === tab.id ? 800 : 500, cursor: "pointer", borderBottom: `2px solid ${wikiTab === tab.id ? C.red : "transparent"}`, transition: "all 0.15s", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                  <i className={`ti ${tab.icon}`} style={{ fontSize: 16 }} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {wikiTab === "scan"      && <ScanTab />}
+              {wikiTab === "search"    && <SearchTab />}
+              {wikiTab === "recommend" && <RecommendTab />}
+            </div>
+          </div>
+        );
+      }
+
+      function ScanTab() {
+        function SweetenerBlock({ name }) {
+          const s = SWEETENERS[name];
+          if (!s) return null;
+          return (
+            <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: s.safe ? C.green : C.red }}>• {name}</span>
+                <span style={s.safe ? styles.tagGood : styles.tagBad}>{s.tag}</span>
+              </div>
+              <div style={{ fontSize: 11.5, color: "#CCC", lineHeight: 1.7, marginBottom: 8 }}>{s.desc}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <span style={s.safe ? styles.tagGood : styles.tagBad}>칼로리 {s.kcal}</span>
+                <span style={s.safe ? styles.tagGood : styles.tagBad}>GI {s.gi}</span>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div style={{ padding: 16 }}>
+            {scanPhase === "idle" && (
+              <>
+                <div style={{ ...styles.card, textAlign: "center", padding: "28px 20px", marginBottom: 14 }}>
+                  <i className="ti ti-camera" style={{ fontSize: 44, color: C.red, marginBottom: 10, display: "block" }} />
+                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>성분표를 스캔해주세요</div>
+                  <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.65, marginBottom: 20 }}>카메라로 제품의 성분표를 스캔하면<br />대체당 성분을 자동으로 분석해 드려요</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button style={{ ...styles.btnPri, flex: 1, fontSize: 12 }} onClick={() => startScan("good")}>
+                      <i className="ti ti-check" style={{ marginRight: 4 }} />좋은 성분 예시
+                    </button>
+                    <button style={{ ...styles.btnOut, flex: 1, fontSize: 12 }} onClick={() => startScan("bad")}>
+                      <i className="ti ti-alert-triangle" style={{ marginRight: 4 }} />주의 성분 예시
+                    </button>
+                  </div>
+                </div>
+                <div style={{ ...styles.card, display: "flex", gap: 10, alignItems: "center" }}>
+                  <i className="ti ti-info-circle" style={{ fontSize: 18, color: C.red, flexShrink: 0 }} />
+                  <div style={{ fontSize: 11.5, color: C.sub, lineHeight: 1.65 }}>
+                    <strong style={{ color: C.text }}>대체당 자동 분류 시스템</strong>으로 무의미한 당을 인식 후 건강한 대체당 함유 제품을 추천합니다.
+                  </div>
+                </div>
+              </>
+            )}
+
+            {scanPhase === "scanning" && (
+              <div style={{ ...styles.card, textAlign: "center", padding: "48px 20px" }}>
+                <i className="ti ti-loader-2" style={{ fontSize: 40, color: C.red, marginBottom: 12, display: "block" }} />
+                <div style={{ fontSize: 14, fontWeight: 700 }}>성분표 분석 중…</div>
+                <div style={{ fontSize: 12, color: C.sub, marginTop: 6 }}>대체당 자동 분류 시스템 작동 중</div>
+              </div>
+            )}
+
+            {scanPhase === "result" && scanData && (
+              <div>
+                <div style={{ ...styles.card, background: scanData.result === "good" ? "rgba(20,40,20,0.8)" : "rgba(40,10,12,0.8)", border: `1px solid ${scanData.result === "good" ? "rgba(76,175,80,0.3)" : "rgba(232,57,74,0.3)"}` }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 14 }}>
+                    <span style={{ fontSize: 16, fontWeight: 900, color: scanData.result === "good" ? C.green : C.red }}>
+                      {scanData.result === "good" ? "✓ 제품 추천!" : "✗ 제품 비추천"}
+                    </span>
+                    <span style={{ fontSize: 11, color: C.sub }}>— {scanData.label}</span>
+                  </div>
+                  {scanData.found.map(name => <SweetenerBlock key={name} name={name} />)}
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button style={{ ...styles.btnPri, flex: 1 }} onClick={() => { setWikiTab("recommend"); setScanPhase("idle"); }}>
+                    대체품 추천으로 →
+                  </button>
+                  <button style={{ ...styles.btnGhost, flex: 1 }} onClick={() => setScanPhase("idle")}>
+                    다시 스캔
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      function SearchTab() {
+        const allKeys = Object.keys(SWEETENERS);
+        const suggestions = ["수크랄로스","에리스리톨","구연산","스테비아","난소화성말덱스트린","이눌린"];
+        const filtered = searchQ ? allKeys.filter(k => k.includes(searchQ) && k !== searchQ) : [];
+
+        return (
+          <div style={{ padding: 16 }}>
+            <div style={{ position: "relative", marginBottom: 14 }}>
+              <input style={{ ...styles.input, paddingRight: 40 }} placeholder="대체당을 입력하세요" value={searchQ}
+                onChange={e => { setSearchQ(e.target.value); setSearchSel(null); }}
+                onKeyDown={e => e.key === "Enter" && doSearch(searchQ)} />
+              <button onClick={() => doSearch(searchQ)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 18, lineHeight: 1 }} aria-label="검색">
+                <i className="ti ti-search" style={{ fontSize: 18 }} />
+              </button>
+            </div>
+
+            {filtered.length > 0 && !searchSel && (
+              <div style={{ ...styles.card, padding: "8px 12px" }}>
+                {filtered.map(k => (
+                  <button key={k} onClick={() => doSearch(k)} style={{ width: "100%", background: "none", border: "none", color: C.text, padding: "9px 0", textAlign: "left", cursor: "pointer", fontSize: 13.5, borderBottom: `1px solid ${C.border}` }}>{k}</button>
+                ))}
+              </div>
+            )}
+
+            {searchSel && (
+              <div style={{ ...styles.card, marginBottom: 14, border: `1px solid ${searchSel.safe ? "rgba(76,175,80,0.3)" : "rgba(232,57,74,0.3)"}`, background: searchSel.safe ? "rgba(20,40,20,0.5)" : "rgba(40,10,12,0.5)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 16, fontWeight: 800 }}>{searchSel.name}</span>
+                  <span style={searchSel.safe ? styles.tagGood : styles.tagBad}>{searchSel.tag}</span>
+                </div>
+                <div style={{ fontSize: 12, color: "#CCC", lineHeight: 1.75, marginBottom: 10 }}>{searchSel.desc}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <span style={searchSel.safe ? styles.tagGood : styles.tagBad}>칼로리 {searchSel.kcal}</span>
+                  <span style={searchSel.safe ? styles.tagGood : styles.tagBad}>GI {searchSel.gi}</span>
+                </div>
+              </div>
+            )}
+
+            {!searchQ && (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, color: C.sub, fontWeight: 700 }}>검색 기록</span>
+                    <button onClick={() => setSearchHistory([])} style={{ background: "none", border: "none", color: C.hint, fontSize: 11, cursor: "pointer" }}>전체 삭제</button>
+                  </div>
+                  {searchHistory.length === 0 && <div style={{ fontSize: 12, color: C.hint, textAlign: "center", padding: "12px 0" }}>검색 기록이 없어요</div>}
+                  {searchHistory.map((h, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
+                      <button onClick={() => doSearch(h)} style={{ background: "none", border: "none", color: C.text, fontSize: 13.5, cursor: "pointer", display: "flex", gap: 8, alignItems: "center" }}>
+                        <i className="ti ti-history" style={{ fontSize: 14, color: C.hint }} />
+                        {h}
+                      </button>
+                      <button onClick={() => setSearchHistory(searchHistory.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.hint, cursor: "pointer", fontSize: 16 }} aria-label={`${h} 검색 기록 삭제`}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: C.sub, fontWeight: 700, marginBottom: 8 }}>추천 검색어</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                    {suggestions.map(s => (
+                      <button key={s} onClick={() => doSearch(s)}
+                        style={{ background: C.surf2, border: `1px solid ${C.border}`, borderRadius: 20, padding: "5px 12px", color: "#CCC", fontSize: 11.5, cursor: "pointer" }}>{s}</button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
+
+      function RecommendTab() {
+        if (recDetail) {
+          return (
+            <div style={{ padding: 16 }}>
+              <button onClick={() => setRecDetail(null)} style={{ background: "none", border: "none", color: C.sub, cursor: "pointer", fontSize: 13, marginBottom: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                <i className="ti ti-arrow-left" style={{ fontSize: 14 }} />목록으로
+              </button>
+              <div style={styles.card}>
+                <div style={{ textAlign: "center", marginBottom: 14 }}>
+                  <i className={`ti ${recDetail.icon}`} style={{ fontSize: 40, color: C.red, display: "block", marginBottom: 8 }} />
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>{recDetail.name}</div>
+                  <div style={{ fontSize: 18, color: C.red, fontWeight: 800, marginTop: 4 }}>{recDetail.price}</div>
+                </div>
+                <div style={styles.divider} />
+                <div style={{ fontSize: 11, color: C.sub, fontWeight: 700, marginBottom: 10 }}>포함 감미료</div>
+                {recDetail.sweeteners.map(name => {
+                  const sw = SWEETENERS[name];
+                  if (!sw) return null;
+                  return (
+                    <div key={name} style={{ marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: C.green }}>• {name}</span>
+                        <span style={styles.tagGood}>{sw.tag}</span>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "#CCC", lineHeight: 1.7 }}>{sw.desc}</div>
+                    </div>
+                  );
+                })}
+                <div style={{ marginTop: 16 }}>
+                  <button style={styles.btnPri} onClick={() => navTo("market")}>
+                    <i className="ti ti-shopping-cart" style={{ marginRight: 6, fontSize: 14 }} />
+                    제로마켓에서 구매하기
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div style={{ padding: 16 }}>
+            <div style={{ ...styles.card, background: "rgba(20,40,20,0.6)", border: `1px solid rgba(76,175,80,0.25)`, marginBottom: 14, display: "flex", gap: 10, alignItems: "center" }}>
+              <i className="ti ti-circle-check" style={{ fontSize: 18, color: C.green, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginBottom: 2 }}>주의 대체당 미포함 제품만 추천</div>
+                <div style={{ fontSize: 11, color: C.sub }}>말티톨·폴리글리시톨 없는 안전한 제로식품</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {PRODUCTS.map(p => (
+                <div key={p.id} style={{ ...styles.card, margin: 0, display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 52, height: 52, background: C.surf2, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <i className={`ti ${p.icon}`} style={{ fontSize: 24, color: C.hint }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>{p.name}</div>
+                    <div style={{ fontSize: 13, color: C.red, fontWeight: 800, marginBottom: 5 }}>{p.price}</div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {p.sweeteners.map(s => <span key={s} style={{ ...styles.tagGood, fontSize: 10, padding: "1px 6px" }}>{s}</span>)}
+                    </div>
+                  </div>
+                  <button onClick={() => setRecDetail(p)}
+                    style={{ background: "transparent", border: `1px solid ${C.red}`, color: C.red, borderRadius: 8, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>상세</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      /* ──────────────── MARKET ──────────────── */
+      function MarketScreen() {
+        const cats = ["전체","음료","스낵","아이스크림","유제품"];
+        const filtered = mktCat === "전체" ? PRODUCTS : PRODUCTS.filter(p => p.cat === mktCat);
+
+        if (mktDetail) {
+          return (
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <SB />
+              <Header title="제로마켓" onBack={() => setMktDetail(null)} />
+              <div style={{ padding: 16 }}>
+                <div style={styles.card}>
+                  <div style={{ textAlign: "center", marginBottom: 16 }}>
+                    <i className={`ti ${mktDetail.icon}`} style={{ fontSize: 52, color: C.red, display: "block", marginBottom: 10 }} />
+                    <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>{mktDetail.name}</div>
+                    <div style={{ fontSize: 20, color: C.red, fontWeight: 900 }}>{mktDetail.price}</div>
+                    <div style={{ marginTop: 6 }}>
+                      <span style={{ background: C.surf2, color: C.sub, borderRadius: 20, padding: "3px 10px", fontSize: 11 }}>{mktDetail.cat}</span>
+                    </div>
+                  </div>
+                  <div style={styles.divider} />
+                  <div style={{ fontSize: 11, color: C.sub, fontWeight: 700, marginBottom: 10 }}>사용 감미료</div>
+                  {mktDetail.sweeteners.map(s => {
+                    const sw = SWEETENERS[s];
+                    return sw ? (
+                      <div key={s} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                        <i className="ti ti-leaf" style={{ fontSize: 14, color: C.green }} />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: C.green }}>{s}</span>
+                        <span style={styles.tagGood}>{sw.tag}</span>
+                      </div>
+                    ) : null;
+                  })}
+                  <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+                    <button style={{ ...styles.btnPri, flex: 2 }} onClick={() => addToCart(mktDetail.id)}>
+                      <i className={`ti ${cart.includes(mktDetail.id) ? "ti-check" : "ti-shopping-cart-plus"}`} style={{ marginRight: 6, fontSize: 14 }} />
+                      {cart.includes(mktDetail.id) ? "장바구니에 담김" : "장바구니 담기"}
+                    </button>
+                    <button style={{ ...styles.btnGhost, flex: 1, fontSize: 12 }} onClick={() => setMktDetail(null)}>
+                      목록으로
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <SB />
+            <Header title="제로마켓" onBack={() => navTo("home")} />
+            <div style={{ padding: "12px 16px" }}>
+              <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 10, marginBottom: 10 }}>
+                {cats.map(cat => (
+                  <button key={cat} onClick={() => setMktCat(cat)}
+                    style={{ background: mktCat === cat ? C.red : C.surf, border: "none", borderRadius: 20, padding: "6px 14px", color: "#FFF", fontSize: 11.5, fontWeight: mktCat === cat ? 700 : 400, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>{cat}</button>
+                ))}
+              </div>
+
+              <div style={{ ...styles.card, display: "flex", gap: 10, alignItems: "center", marginBottom: 14, background: "rgba(20,40,20,0.5)", border: `1px solid rgba(76,175,80,0.2)` }}>
+                <i className="ti ti-shield-check" style={{ fontSize: 20, color: C.green, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>주의 성분 없는 제품만 선별!</div>
+                  <div style={{ fontSize: 11, color: C.sub, marginTop: 1 }}>말티톨 · 폴리글리시톨 미포함 제품만 추천해요</div>
+                </div>
+                {cart.length > 0 && (
+                  <div style={{ marginLeft: "auto", background: C.red, color: "#fff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                    <i className="ti ti-shopping-cart" style={{ fontSize: 12, marginRight: 3 }} />
+                    {cart.length}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, paddingBottom: 16 }}>
+                {filtered.map(p => (
+                  <div key={p.id} style={{ ...styles.card, margin: 0, padding: 12 }}>
+                    <div style={{ background: C.surf2, borderRadius: 10, padding: "14px 0", textAlign: "center", marginBottom: 10 }}>
+                      <i className={`ti ${p.icon}`} style={{ fontSize: 32, color: C.hint }} />
+                    </div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 3, lineHeight: 1.35 }}>{p.name}</div>
+                    <div style={{ fontSize: 13.5, color: C.red, fontWeight: 800, marginBottom: 7 }}>{p.price}</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 9 }}>
+                      {p.sweeteners.map(s => <span key={s} style={{ ...styles.tagGood, fontSize: 9.5, padding: "1px 5px" }}>{s}</span>)}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => setMktDetail(p)}
+                        style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.sub, borderRadius: 7, padding: "5px 0", fontSize: 11, cursor: "pointer" }}>상세</button>
+                      <button onClick={() => addToCart(p.id)}
+                        style={{ flex: 1, background: cart.includes(p.id) ? C.greenDim : C.redDim, border: `1px solid ${cart.includes(p.id) ? "rgba(76,175,80,0.4)" : "rgba(232,57,74,0.4)"}`, color: cart.includes(p.id) ? C.green : C.red, borderRadius: 7, padding: "5px 0", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                        {cart.includes(p.id) ? "담김 ✓" : "담기"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ──────────────── ROOT RENDER ──────────────── */
+      const isLogin = screen === "login";
+      return (
+        <div style={{ background: "#080808", minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 0 32px", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
+          <h2 className="sr-only">ZeroFit — 건강한 제로식품 안내 앱</h2>
+          <div style={styles.phone} role="main">
+            {isLogin ? (
+              <LoginScreen />
+            ) : (
+              <>
+                <div style={{ flex: 1, overflowY: "hidden", display: "flex", flexDirection: "column" }}>
+                  {screen === "home"   && <HomeScreen />}
+                  {screen === "mypage" && <MyPageScreen />}
+                  {screen === "wiki"   && <WikiScreen />}
+                  {screen === "market" && <MarketScreen />}
+                </div>
+                <NavBar />
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<ZeroFit />);
+  </script>
+</body>
+</html>
